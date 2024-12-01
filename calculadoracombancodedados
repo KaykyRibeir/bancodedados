@@ -1,0 +1,139 @@
+import sqlite3
+from tkinter import *
+from tkinter import ttk
+
+# Cores
+cor_fundo = '#f0f0f0'
+cor_texto = '#333333'
+cor_campo = '#e0e0e0'
+cor_botao = '#cccccc'
+cor_resultado = '#e6e6e6'
+cor_titulo_bg = '#000000'
+cor_titulo_fg = '#ffffff'
+
+# Configuração da Janela
+janela = Tk()
+janela.title('Calculadora de IMC')
+janela.geometry("500x500")
+janela.configure(bg=cor_fundo)
+
+# Função para Conectar ao Banco de Dados
+def conectar_bd():
+    conn = sqlite3.connect('imc.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS imc_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        peso REAL NOT NULL,
+        altura REAL NOT NULL,
+        imc REAL NOT NULL,
+        categoria TEXT NOT NULL,
+        data_calculo TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    conn.commit()
+    conn.close()
+
+# Função para Calcular IMC e Salvar no Banco
+def calcular():
+    try:
+        nome = e_nome.get().strip()
+        peso = float(e_peso.get())
+        altura = float(e_altura.get())
+        
+        if not nome or altura <= 0 or peso <= 0:
+            raise ValueError("Valores inválidos")
+        
+        resultado = peso / (altura ** 2)
+        categoria = "Abaixo do peso" if resultado < 18.5 else "Normal" if resultado < 25 else "Sobrepeso" if resultado < 30 else "Obesidade"
+        
+        l_resultado_valor['text'] = f"{resultado:.2f}"
+        l_resultado_texto['text'] = f"{nome}, seu IMC indica: {categoria}"
+        
+        # Salvar no banco de dados
+        conn = sqlite3.connect('imc.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+        INSERT INTO imc_records (nome, peso, altura, imc, categoria) 
+        VALUES (?, ?, ?, ?, ?)''', (nome, peso, altura, resultado, categoria))
+        conn.commit()
+        conn.close()
+        
+        print("Dados salvos no banco com sucesso!")
+    except ValueError:
+        l_resultado_valor['text'] = "---"
+        l_resultado_texto['text'] = "Insira valores válidos."
+
+# Função para Consultar Registros
+def consultar_registros():
+    consulta_janela = Toplevel(janela)
+    consulta_janela.title("Registros de IMC")
+    consulta_janela.geometry("600x400")
+    consulta_janela.configure(bg=cor_fundo)
+    
+    tree = ttk.Treeview(consulta_janela, columns=("Nome", "Peso", "Altura", "IMC", "Categoria", "Data"), show="headings")
+    tree.heading("Nome", text="Nome")
+    tree.heading("Peso", text="Peso (kg)")
+    tree.heading("Altura", text="Altura (m)")
+    tree.heading("IMC", text="IMC")
+    tree.heading("Categoria", text="Categoria")
+    tree.heading("Data", text="Data")
+    
+    tree.pack(fill=BOTH, expand=True, padx=10, pady=10)
+    
+    conn = sqlite3.connect('imc.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT nome, peso, altura, imc, categoria, data_calculo FROM imc_records")
+    registros = cursor.fetchall()
+    conn.close()
+    
+    for registro in registros:
+        tree.insert("", "end", values=registro)
+
+# Função Reiniciar
+def reiniciar():
+    e_nome.delete(0, END)
+    e_peso.delete(0, END)
+    e_altura.delete(0, END)
+    l_resultado_valor['text'] = "---"
+    l_resultado_texto['text'] = ""
+
+# Título
+titulo = Label(janela, text='Calculadora de IMC', font=('Arial', 18, 'bold'), bg=cor_titulo_bg, fg=cor_titulo_fg)
+titulo.pack(fill="x", pady=10)
+
+# Campos de Entrada
+Label(janela, text="Nome:", font=('Arial', 12), bg=cor_fundo, fg=cor_texto).pack(pady=5)
+e_nome = Entry(janela, font=('Arial', 12), bg=cor_campo, fg=cor_texto)
+e_nome.pack(pady=5)
+
+Label(janela, text="Peso (kg):", font=('Arial', 12), bg=cor_fundo, fg=cor_texto).pack(pady=5)
+e_peso = Entry(janela, font=('Arial', 12), bg=cor_campo, fg=cor_texto)
+e_peso.pack(pady=5)
+
+Label(janela, text="Altura (m):", font=('Arial', 12), bg=cor_fundo, fg=cor_texto).pack(pady=5)
+e_altura = Entry(janela, font=('Arial', 12), bg=cor_campo, fg=cor_texto)
+e_altura.pack(pady=5)
+
+# Bloco de Resultado
+l_resultado_valor = Label(janela, text="---", font=('Arial', 24, 'bold'), bg=cor_resultado, fg=cor_texto)
+l_resultado_valor.pack(pady=10)
+
+l_resultado_texto = Label(janela, text="", font=('Arial', 12), bg=cor_fundo, fg=cor_texto)
+l_resultado_texto.pack(pady=10)
+
+# Botões
+frame_botoes = Frame(janela, bg=cor_fundo)
+frame_botoes.pack(pady=10)
+
+Button(frame_botoes, text='Calcular', font=('Arial', 12), bg=cor_botao, fg=cor_texto, command=calcular).pack(side=LEFT, padx=5)
+Button(frame_botoes, text='Consultar Registros', font=('Arial', 12), bg=cor_botao, fg=cor_texto, command=consultar_registros).pack(side=LEFT, padx=5)
+Button(frame_botoes, text='Reiniciar', font=('Arial', 12), bg=cor_botao, fg=cor_texto, command=reiniciar).pack(side=LEFT, padx=5)
+Button(frame_botoes, text='Sair', font=('Arial', 12), bg=cor_botao, fg=cor_texto, command=janela.quit).pack(side=LEFT, padx=5)
+
+# Inicializar Banco de Dados
+conectar_bd()
+
+janela.mainloop()
+
