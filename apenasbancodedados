@@ -1,0 +1,96 @@
+import sqlite3
+from datetime import datetime
+
+# Função para Conectar ao Banco de Dados e Criar a Tabela
+def conectar_bd():
+    conn = sqlite3.connect('imc.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS imc_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        peso REAL NOT NULL,
+        altura REAL NOT NULL,
+        imc REAL NOT NULL,
+        categoria TEXT NOT NULL,
+        data_calculo TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    conn.commit()
+    conn.close()
+
+# Função para Calcular o IMC e Determinar a Categoria
+def calcular_imc(peso, altura):
+    imc = peso / (altura ** 2)
+    if imc < 18.5:
+        categoria = "Abaixo do peso"
+    elif imc < 25:
+        categoria = "Normal"
+    elif imc < 30:
+        categoria = "Sobrepeso"
+    else:
+        categoria = "Obesidade"
+    return round(imc, 2), categoria
+
+# Função para Inserir Dados no Banco de Dados
+def inserir_dados(nome, peso, altura):
+    imc, categoria = calcular_imc(peso, altura)
+    data_calculo = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    conn = sqlite3.connect('imc.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+    INSERT INTO imc_records (nome, peso, altura, imc, categoria, data_calculo)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ''', (nome, peso, altura, imc, categoria, data_calculo))
+    conn.commit()
+    conn.close()
+    
+    print(f"IMC de {nome}: {imc} ({categoria}) - Dados salvos com sucesso!")
+
+# Função para Consultar os Registros no Banco de Dados
+def consultar_registros():
+    conn = sqlite3.connect('imc.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM imc_records")
+    registros = cursor.fetchall()
+    conn.close()
+
+    if registros:
+        print("\n--- Registros de IMC ---")
+        for registro in registros:
+            print(f"ID: {registro[0]}, Nome: {registro[1]}, Peso: {registro[2]}kg, Altura: {registro[3]}m, IMC: {registro[4]}, Categoria: {registro[5]}, Data: {registro[6]}")
+    else:
+        print("Nenhum registro encontrado.")
+
+# Função Principal (Menu)
+def main():
+    conectar_bd()
+    while True:
+        print("\n--- Calculadora de IMC ---")
+        print("1. Calcular IMC")
+        print("2. Consultar Registros")
+        print("3. Sair")
+        opcao = input("Escolha uma opção: ")
+
+        if opcao == "1":
+            try:
+                nome = input("Digite seu nome: ").strip()
+                peso = float(input("Digite seu peso (em kg): "))
+                altura = float(input("Digite sua altura (em metros): "))
+                if not nome or peso <= 0 or altura <= 0:
+                    raise ValueError("Valores inválidos!")
+                inserir_dados(nome, peso, altura)
+            except ValueError as e:
+                print(f"Erro: {e}")
+        elif opcao == "2":
+            consultar_registros()
+        elif opcao == "3":
+            print("Saindo... Até mais!")
+            break
+        else:
+            print("Opção inválida. Tente novamente.")
+
+# Executar o Programa
+if __name__ == "__main__":
+    main()
